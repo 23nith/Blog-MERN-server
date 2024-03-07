@@ -5,46 +5,85 @@ const path = require('path')
 const fs = require('fs')
 const {v4: uuid} = require('uuid')
 const HttpError = require('../models/errorModel')
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+require('dotenv').config()
+const crypto = require('crypto')
+
+const randomImageName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex')
+
+const bucketName =  process.env.BUCKET_NAME
+const bucketRegion =  process.env.REGION
+const accessKey =  process.env.ACCESS_KEY
+const secretAccessKey =  process.env.SECRET_KEY
+
+const s3 = new S3Client({
+    credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretAccessKey
+    },
+    region: bucketRegion
+});
 
 // ==================== CREATE A POST
 // POST : api/posts
 // PROTECTED
 const createPost = async (req, res, next) => {
     // res.json("Create Post")
-    try {
-        let {title, category, description} = req.body;
-        if(!title || !category || !description || !req.files){
-            return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
-        }
-        
-        const {thumbnail} = req.files;
-        // check the file size
-        if(thumbnail.size > 2000000) {
-            return next(new HttpError("Thumbnail too big. File should be less than 2mb."))
-        }
-        let fileName = thumbnail.name;
-        let splittedFilename = fileName.split('.')
-        let newFilename = splittedFilename[0] + uuid() + '.' + splittedFilename[splittedFilename.length - 1]
-        thumbnail.mv(path.join(__dirname, '..', '/uploads', newFilename), async (err) => {
-            if(err){
-                return next(new HttpError(err))
-            } else {
-                const newPost = await Post.create({title, category, description, thumbnail: newFilename, creator: req.user.id})
-                if(!newPost){
-                    return next(new HttpError("Post couldn't be created.", 422))
-                }
-                // find user and increase post count by 1
-                const currentUser = await User.findById(req.user.id);
-                const userPostCount = currentUser.posts + 1;
-                await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
+    console.log("req.body", req.body)
+    // console.log("req.files", req.files)
+    console.log("req.file", req.file)
+    // req.files.data
+    req.file.buffer
 
-                res.status(201).json(newPost)
-            }
-        })
-    }catch (error){
-        console.log(error)
-        return next(new HttpError(error)) 
+    const params = {
+        Bucket: bucketName,
+        // Key: req.file.originalname,
+        Key: randomImageName(),
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+        ACL: 'public-read'
     }
+
+    const command = new PutObjectCommand(params)
+
+    await s3.send(command)
+    
+    res.send({})
+
+    // try {
+        // let {title, category, description} = req.body;
+    //     if(!title || !category || !description || !req.files){
+    //         return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
+    //     }
+        
+    //     const {thumbnail} = req.files;
+    //     // check the file size
+    //     if(thumbnail.size > 2000000) {
+    //         return next(new HttpError("Thumbnail too big. File should be less than 2mb."))
+    //     }
+    //     let fileName = thumbnail.name;
+    //     let splittedFilename = fileName.split('.')
+    //     let newFilename = splittedFilename[0] + uuid() + '.' + splittedFilename[splittedFilename.length - 1]
+    //     thumbnail.mv(path.join(__dirname, '..', '/uploads', newFilename), async (err) => {
+    //         if(err){
+    //             return next(new HttpError(err))
+    //         } else {
+    //             const newPost = await Post.create({title, category, description, thumbnail: newFilename, creator: req.user.id})
+    //             if(!newPost){
+    //                 return next(new HttpError("Post couldn't be created.", 422))
+    //             }
+    //             // find user and increase post count by 1
+    //             const currentUser = await User.findById(req.user.id);
+    //             const userPostCount = currentUser.posts + 1;
+    //             await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
+
+    //             res.status(201).json(newPost)
+    //         }
+    //     })
+    // }catch (error){
+    //     console.log(error)
+    //     return next(new HttpError(error)) 
+    // }
 }
 
 // ==================== GET ALL POSTS
