@@ -37,6 +37,12 @@ const createPost = async (req, res, next) => {
             return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
         }
 
+        const thumbnail = req.file;
+        // check the file size
+        if(thumbnail.size > 2000000) {
+            return next(new HttpError("Thumbnail too big. File should be less than 2mb."))
+        }
+
         const imageName = randomImageName()
 
         const params = {
@@ -51,11 +57,6 @@ const createPost = async (req, res, next) => {
         const command = new PutObjectCommand(params)
         await s3.send(command)
         
-        const thumbnail = req.file;
-        // check the file size
-        if(thumbnail.size > 2000000) {
-            return next(new HttpError("Thumbnail too big. File should be less than 2mb."))
-        }
         
         const newPost = await Post.create({title, category, description, thumbnail: `${process.env.AWS_LINK}${imageName}`, creator: req.user.id})
         if(!newPost){

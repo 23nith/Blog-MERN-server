@@ -2,7 +2,6 @@ const {Router} = require('express')
 
 const {createPost, getPosts, getPost, getCatPost, getUserPosts, editPost, deletePost} = require('../controllers/postControllers')
 const authMiddleware = require('../middleware/authMiddleware')
-const bodyParser = require('body-parser')
 
 const multer = require('multer')
 const storage = multer.memoryStorage()
