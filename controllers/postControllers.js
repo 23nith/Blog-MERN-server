@@ -35,10 +35,12 @@ const createPost = async (req, res, next) => {
     // req.files.data
     req.file.buffer
 
+    const imageName = randomImageName()
+
     const params = {
         Bucket: bucketName,
         // Key: req.file.originalname,
-        Key: randomImageName(),
+        Key: imageName,
         Body: req.file.buffer,
         ContentType: req.file.mimetype,
         ACL: 'public-read'
@@ -47,8 +49,28 @@ const createPost = async (req, res, next) => {
     const command = new PutObjectCommand(params)
 
     await s3.send(command)
+
+    // test 
+
+    let {title, category, description} = req.body;
+    if(!title || !category || !description || !req.file){
+        return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
+    }
+
+    const newPost = await Post.create({title, category, description, thumbnail: imageName.toString(), creator: req.user.id})
+    if(!newPost){
+        return next(new HttpError("Post couldn't be created.", 422))
+    }
+    // find user and increase post count by 1
+    const currentUser = await User.findById(req.user.id);
+    const userPostCount = currentUser.posts + 1;
+    await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
+
+    res.status(201).json(newPost)
+
+    // test
     
-    res.send({})
+    // res.send({})
 
     // try {
         // let {title, category, description} = req.body;
