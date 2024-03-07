@@ -7,6 +7,25 @@ const {v4: uuid} = require("uuid")
 const User = require('../models/userModel')
 const HttpError = require("../models/errorModel")
 
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+require('dotenv').config()
+const crypto = require('crypto')
+
+const randomImageName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex')
+
+const bucketName =  process.env.BUCKET_NAME
+const bucketRegion =  process.env.REGION
+const accessKey =  process.env.ACCESS_KEY
+const secretAccessKey =  process.env.SECRET_KEY
+
+const s3 = new S3Client({
+    credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretAccessKey
+    },
+    region: bucketRegion
+});
+
 // ==================== REGISTER A NEW USER
 // POST : api/users/register
 // UNPROTECTED
@@ -100,41 +119,56 @@ const changeAvatar = async (req, res, next) => {
     try {
         // res.json(req.files)
         // console.log(req.files)
-        if(!req.files.avatar){
+        console.log("req.file: ", req.file)
+        if(!req.file){
             return next(new HttpError("Please choose an image.", 422))
         }
 
         // find user from database
-        const user = await User.findById(req.user.id)
+        // const user = await User.findById(req.user.id)
         // delete old avatar if exists
-        if(user.avatar){
-            fs.unlink(path.join(__dirname, '..', 'uploads', user.avatar), (err) => {
-                if(err) {
-                    return next( new HttpError(err))
-                }
-            })
-        }
+        // if(user.avatar){
+        //     fs.unlink(path.join(__dirname, '..', 'uploads', user.avatar), (err) => {
+        //         if(err) {
+        //             return next( new HttpError(err))
+        //         }
+        //     })
+        // }
 
-        const {avatar} = req.files;
+        const avatar = req.file;
         if(avatar.size > 500000){
             return next(new HttpError("Profile picture too big. Should be less than 500kb"), 422)
         }
 
-        let fileName;
-        fileName = avatar.name;
-        let splittedFilename = fileName.split('.')
-        let newFilename = splittedFilename[0] + uuid() + "." + splittedFilename[splittedFilename.length - 1]
-        avatar.mv(path.join(__dirname, "..", "uploads", newFilename), async (err) => {
-            if(err){ 
-                return next(new HttpError(err))
-            }
+        const imageName = randomImageName()
 
-            const updatedAvatar = await User.findByIdAndUpdate(req.user.id, {avatar: newFilename}, {new: true})
+        const params = {
+            Bucket: bucketName,
+            // Key: req.file.originalname,
+            Key: imageName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+            ACL: 'public-read'
+        }
+
+        const command = new PutObjectCommand(params)
+        await s3.send(command)
+
+        // let fileName;
+        // fileName = avatar.name;
+        // let splittedFilename = fileName.split('.')
+        // let newFilename = splittedFilename[0] + uuid() + "." + splittedFilename[splittedFilename.length - 1]
+        // avatar.mv(path.join(__dirname, "..", "uploads", newFilename), async (err) => {
+            // if(err){ 
+            //     return next(new HttpError(err))
+            // }
+
+            const updatedAvatar = await User.findByIdAndUpdate(req.user.id, {avatar: `${process.env.AWS_LINK}${imageName}`}, {new: true})
             if(!updatedAvatar){
                 return next(new HttpError("Avatar couldn't be changed.", 422))
             }
             res.status(200).json(updatedAvatar)
-        })
+        // })
     } catch (error) {
         return next(new HttpError(error))
     }
