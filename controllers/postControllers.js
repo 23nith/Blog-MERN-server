@@ -5,7 +5,7 @@ const path = require('path')
 const fs = require('fs')
 const {v4: uuid} = require('uuid')
 const HttpError = require('../models/errorModel')
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 require('dotenv').config()
 const crypto = require('crypto')
 
@@ -142,43 +142,55 @@ const editPost = async (req, res, next) => {
     // res.json("Edit Post")
     // console.log("req.user.id: ", req.user.id)
     try{
-        let fileName;
-        let newFilename;
         let updatedPost;
         const postId = req.params.id;
         let {title, category, description} = req.body;
+        console.log("req.body: ", req.body)
         // ReactQuill has a paragraph opening and closing tag with a break tag in between so there are 11 characters in ther already.
         if(!title || !category || description.length < 12){
+        // if(!title || !category || !description){
             return next(new HttpError("Fill in all fields.", 422))
         }
         // get old post from database
         const oldPost = await Post.findById(postId);
-            if(!req.files){
-                updatedPost = await Post.findByIdAndUpdate(postId, {title, category, description}, {new: true})
-            } else {
-                // delete old thumbnail from upload
-                fs.unlink(path.join(__dirname, "..", 'uploads', oldPost.thumbnail), async (err) => {
-                    if(err){
-                        return next(new HttpError(err))
-                    }
-                })
-                // upload new thumbnail
-                const {thumbnail} = req.files;
-                // check file size
-                if(thumbnail.size > 2000000){
-                    return new(new HttpError("Thumbnail too big. Should be less than 2mb."))
-                }
-                fileName = thumbnail.name;
-                let splittedFilename = fileName.split('.')
-                newFilename = splittedFilename[0] + uuid() + "." + splittedFilename[splittedFilename.length - 1]
-                thumbnail.mv(path.join(__dirname, '..', 'uploads', newFilename), async(err)=> {
-                    if(err){
-                        return next(new HttpError(err))
-                    }
-                })
-                updatedPost = await Post.findByIdAndUpdate(postId, {title, category, description, thumbnail: newFilename}, {new: true}) 
+        if(!req.file){
+            updatedPost = await Post.findByIdAndUpdate(postId, {title, category, description}, {new: true})
+        } else {
+            // delete old thumbnail from upload
+            const oldPostThumbnail = oldPost.thumbnail.substring(process.env.AWS_LINK.toString().length)
+
+            const toDeleteparams = {
+                Bucket: bucketName,
+                // Key: req.file.originalname,
+                Key: oldPostThumbnail
             }
-        // }
+
+            const command = new DeleteObjectCommand(toDeleteparams)
+            await s3.send(command)
+
+            // upload new thumbnail
+            const thumbnail = req.file;
+            // check file size
+            if(thumbnail.size > 2000000){
+                return new(new HttpError("Thumbnail too big. Should be less than 2mb."))
+            }
+
+            const imageName = randomImageName()
+
+            const params = {
+                Bucket: bucketName,
+                // Key: req.file.originalname,
+                Key: imageName,
+                Body: req.file.buffer,
+                ContentType: req.file.mimetype,
+                ACL: 'public-read'
+            }
+
+            const updateCommand = new PutObjectCommand(params)
+            await s3.send(updateCommand)
+
+            updatedPost = await Post.findByIdAndUpdate(postId, {title, category, description, thumbnail: `${process.env.AWS_LINK}${imageName}`}, {new: true}) 
+        }
 
         if(!updatedPost){
             console.log('error here!')
