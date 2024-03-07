@@ -57,7 +57,7 @@ const createPost = async (req, res, next) => {
             return next(new HttpError("Thumbnail too big. File should be less than 2mb."))
         }
         
-        const newPost = await Post.create({title, category, description, thumbnail: imageName, creator: req.user.id})
+        const newPost = await Post.create({title, category, description, thumbnail: `${process.env.AWS_LINK}${imageName}`, creator: req.user.id})
         if(!newPost){
             return next(new HttpError("Post couldn't be created.", 422))
         }
