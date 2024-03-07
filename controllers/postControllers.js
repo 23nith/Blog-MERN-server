@@ -29,83 +29,87 @@ const s3 = new S3Client({
 // PROTECTED
 const createPost = async (req, res, next) => {
     // res.json("Create Post")
-    console.log("req.body", req.body)
-    // console.log("req.files", req.files)
-    console.log("req.file", req.file)
-    // req.files.data
-    req.file.buffer
-
-    const imageName = randomImageName()
-
-    const params = {
-        Bucket: bucketName,
-        // Key: req.file.originalname,
-        Key: imageName,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype,
-        ACL: 'public-read'
-    }
-
-    const command = new PutObjectCommand(params)
-
-    await s3.send(command)
+    
 
     // test 
 
-    let {title, category, description} = req.body;
-    if(!title || !category || !description || !req.file){
-        return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
-    }
+    // let {title, category, description} = req.body;
+    // if(!title || !category || !description || !req.file){
+    //     return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
+    // }
 
-    const newPost = await Post.create({title, category, description, thumbnail: imageName.toString(), creator: req.user.id})
-    if(!newPost){
-        return next(new HttpError("Post couldn't be created.", 422))
-    }
-    // find user and increase post count by 1
-    const currentUser = await User.findById(req.user.id);
-    const userPostCount = currentUser.posts + 1;
-    await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
+    // const newPost = await Post.create({title, category, description, thumbnail: imageName.toString(), creator: req.user.id})
+    // if(!newPost){
+    //     return next(new HttpError("Post couldn't be created.", 422))
+    // }
+    // // find user and increase post count by 1
+    // const currentUser = await User.findById(req.user.id);
+    // const userPostCount = currentUser.posts + 1;
+    // await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
 
-    res.status(201).json(newPost)
+    // res.status(201).json(newPost)
 
     // test
     
     // res.send({})
 
-    // try {
-        // let {title, category, description} = req.body;
-    //     if(!title || !category || !description || !req.files){
-    //         return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
-    //     }
-        
-    //     const {thumbnail} = req.files;
-    //     // check the file size
-    //     if(thumbnail.size > 2000000) {
-    //         return next(new HttpError("Thumbnail too big. File should be less than 2mb."))
-    //     }
-    //     let fileName = thumbnail.name;
-    //     let splittedFilename = fileName.split('.')
-    //     let newFilename = splittedFilename[0] + uuid() + '.' + splittedFilename[splittedFilename.length - 1]
-    //     thumbnail.mv(path.join(__dirname, '..', '/uploads', newFilename), async (err) => {
-    //         if(err){
-    //             return next(new HttpError(err))
-    //         } else {
-    //             const newPost = await Post.create({title, category, description, thumbnail: newFilename, creator: req.user.id})
-    //             if(!newPost){
-    //                 return next(new HttpError("Post couldn't be created.", 422))
-    //             }
-    //             // find user and increase post count by 1
-    //             const currentUser = await User.findById(req.user.id);
-    //             const userPostCount = currentUser.posts + 1;
-    //             await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
+    try {
+        console.log("req.body", req.body)
+        // console.log("req.files", req.files)
+        console.log("req.file", req.file)
+        console.log("req.file.buffer", req.file.buffer)
+        console.log("req.file.size", req.file.size)
+        // req.files.data
+        req.file.buffer
 
-    //             res.status(201).json(newPost)
-    //         }
-    //     })
-    // }catch (error){
-    //     console.log(error)
-    //     return next(new HttpError(error)) 
-    // }
+        const imageName = randomImageName()
+
+        const params = {
+            Bucket: bucketName,
+            // Key: req.file.originalname,
+            Key: imageName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+            ACL: 'public-read'
+        }
+
+        const command = new PutObjectCommand(params)
+
+        await s3.send(command)
+        
+        let {title, category, description} = req.body;
+        if(!title || !category || !description || !req.file){
+            return next(new HttpError("Fill in all fields and choose thumbnail.", 422))
+        }
+        
+        const thumbnail = req.file;
+        // check the file size
+        if(thumbnail.size > 2000000) {
+            return next(new HttpError("Thumbnail too big. File should be less than 2mb."))
+        }
+        // let fileName = thumbnail.name;
+        // let splittedFilename = fileName.split('.')
+        // let newFilename = splittedFilename[0] + uuid() + '.' + splittedFilename[splittedFilename.length - 1]
+        // thumbnail.mv(path.join(__dirname, '..', '/uploads', newFilename), async (err) => {
+        //     if(err){
+        //         return next(new HttpError(err))
+        //     } else {
+                const newPost = await Post.create({title, category, description, thumbnail: imageName, creator: req.user.id})
+                if(!newPost){
+                    return next(new HttpError("Post couldn't be created.", 422))
+                }
+                // find user and increase post count by 1
+                const currentUser = await User.findById(req.user.id);
+                const userPostCount = currentUser.posts + 1;
+                await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
+
+                res.status(201).json(newPost)
+        //     }
+        // })
+    }catch (error){
+        console.log(error)
+        return next(new HttpError(error)) 
+    }
 }
 
 // ==================== GET ALL POSTS
