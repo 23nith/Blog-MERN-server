@@ -117,23 +117,10 @@ const changeAvatar = async (req, res, next) => {
     // res.json("Change User Avatar")
 
     try {
-        // res.json(req.files)
-        // console.log(req.files)
         console.log("req.file: ", req.file)
         if(!req.file){
             return next(new HttpError("Please choose an image.", 422))
         }
-
-        // find user from database
-        // const user = await User.findById(req.user.id)
-        // delete old avatar if exists
-        // if(user.avatar){
-        //     fs.unlink(path.join(__dirname, '..', 'uploads', user.avatar), (err) => {
-        //         if(err) {
-        //             return next( new HttpError(err))
-        //         }
-        //     })
-        // }
 
         const avatar = req.file;
         if(avatar.size > 500000){
@@ -154,21 +141,11 @@ const changeAvatar = async (req, res, next) => {
         const command = new PutObjectCommand(params)
         await s3.send(command)
 
-        // let fileName;
-        // fileName = avatar.name;
-        // let splittedFilename = fileName.split('.')
-        // let newFilename = splittedFilename[0] + uuid() + "." + splittedFilename[splittedFilename.length - 1]
-        // avatar.mv(path.join(__dirname, "..", "uploads", newFilename), async (err) => {
-            // if(err){ 
-            //     return next(new HttpError(err))
-            // }
-
-            const updatedAvatar = await User.findByIdAndUpdate(req.user.id, {avatar: `${process.env.AWS_LINK}${imageName}`}, {new: true})
-            if(!updatedAvatar){
-                return next(new HttpError("Avatar couldn't be changed.", 422))
-            }
-            res.status(200).json(updatedAvatar)
-        // })
+        const updatedAvatar = await User.findByIdAndUpdate(req.user.id, {avatar: `${process.env.AWS_LINK}${imageName}`}, {new: true})
+        if(!updatedAvatar){
+            return next(new HttpError("Avatar couldn't be changed.", 422))
+        }
+        res.status(200).json(updatedAvatar)
     } catch (error) {
         return next(new HttpError(error))
     }
