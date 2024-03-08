@@ -208,28 +208,37 @@ const editPost = async (req, res, next) => {
 // PROTECTED
 const deletePost = async (req, res, next) => {
     // res.json("Delete Post")
-    // console.log("req.user.id: ", req.user.id)
     try{
         const postId = req.params.id;
+        console.log("postId", postId)
         if(!postId){
             return next(new HttpError("Post unavailable.", 400))
         }
         const post = await Post.findById(postId);
         const fileName = post?.thumbnail;
+        console.log(fileName)
         if(req.user.id == post.creator){
+            // delete post
+            await Post.findByIdAndDelete(postId);
+            // find user and reduce post count by 1
+            const currentUser = await User.findById(req.user.id);
+            const userPostCount = currentUser?.posts - 1;
+            await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
+        
             // delete thumbnail from uploads folder
-            fs.unlink(path.join(__dirname, '..', 'uploads', fileName), async(err)=>{
-                if(err){
-                    return next(new HttpError(err))
-                } else {
-                    await Post.findByIdAndDelete(postId);
-                    // find user and reduce post count by 1
-                    const currentUser = await User.findById(req.user.id);
-                    const userPostCount = currentUser?.posts - 1;
-                    await User.findByIdAndUpdate(req.user.id, {posts: userPostCount})
-                    res.json(`Post ${postId} deleted successfully.`)
-                }
-            })
+            const oldPostThumbnail = fileName.substring(process.env.AWS_LINK.toString().length)
+
+            console.log("oldPostThumbnail", oldPostThumbnail)
+            const toDeleteparams = {
+                Bucket: bucketName,
+                Key: oldPostThumbnail
+            }
+
+            const command = new DeleteObjectCommand(toDeleteparams)
+            await s3.send(command)
+
+            res.json(`Post ${postId} deleted successfully.`)
+
         }else{
             return next(new HttpError("Post couldn't be deleted.", 403))
         }

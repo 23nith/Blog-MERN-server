@@ -16,6 +16,6 @@ router.patch('/:id', _upload.single('thumbnail'), editPost)
 router.get('/categories/:category', getCatPost)
 router.get('/users/:id', getUserPosts)
 router.patch('/:id', authMiddleware, _upload.single('thumbnail'), editPost)
-router.delete('/:id', authMiddleware, deletePost)
+router.delete('/:id', authMiddleware, _upload.single('thumbnail'), deletePost)
 
 module.exports = router
