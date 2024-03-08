@@ -7,7 +7,7 @@ const {v4: uuid} = require("uuid")
 const User = require('../models/userModel')
 const HttpError = require("../models/errorModel")
 
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 require('dotenv').config()
 const crypto = require('crypto')
 
@@ -120,6 +120,22 @@ const changeAvatar = async (req, res, next) => {
         console.log("req.file: ", req.file)
         if(!req.file){
             return next(new HttpError("Please choose an image.", 422))
+        }
+
+        // find user from database
+        const user = await User.findById(req.user.id)
+
+        // delete old avatar if exists
+        if(user.avatar){
+            const oldUserAvatar = user.avatar.substring(process.env.AWS_LINK.toString().length)
+
+            const toDeleteparams = {
+                Bucket: bucketName,
+                Key: oldUserAvatar
+            }
+
+            const command = new DeleteObjectCommand(toDeleteparams)
+            await s3.send(command)
         }
 
         const avatar = req.file;
